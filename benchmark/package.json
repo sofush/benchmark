@@ -1,0 +1,16 @@
+{
+  "name": "benchmark",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "sofush",
+  "license": "ISC",
+  "description": "",
+  "type": "module",
+  "dependencies": {
+    "express": "^4.21.2",
+    "jimp": "^1.6.0"
+  }
+}

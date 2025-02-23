@@ -1,6 +1,6 @@
 use std::{
     io::{BufReader, BufWriter, Read, Write},
-    net::TcpListener,
+    net::{Shutdown, TcpListener},
 };
 
 use bitmap_image_header::BitmapImageHeader;
@@ -125,10 +125,20 @@ fn main() {
 
                     BufWriter::with_capacity(65_536, stream_clone)
                 };
-                let reader = BufReader::with_capacity(65_536, stream);
+                let reader = {
+                    let Ok(stream_clone) = stream.try_clone() else {
+                        eprintln!("Could not clone TCP stream.");
+                        return;
+                    };
+                    BufReader::with_capacity(65_536, stream_clone)
+                };
 
                 if let Err(e) = handle_connection(reader, writer) {
                     eprintln!("Error: {e}");
+                }
+
+                if let Err(e) = stream.shutdown(Shutdown::Both) {
+                    eprintln!("Could not shutdown stream: {e}");
                 }
             }
             Err(e) => println!("Could not get client: {e}"),

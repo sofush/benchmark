@@ -55,6 +55,20 @@ class BitmapHeader():
         rw.write(self.header)
         rw.write(self.remainder)
 
+def convert_to_greyscale_numpy(rw: io.IOBase, bmp: BitmapHeader, np):
+    row_width = 3 * bmp.width()
+    padding = ((row_width + 3) & ~3) - row_width
+
+    for _ in range(bmp.height()):
+        row = rw.read(row_width)
+        row_data = np.frombuffer(row, dtype=np.uint8).reshape(-1, 3)
+
+        greys = np.dot(row_data, [0.299, 0.587, 0.114]).astype(np.uint8)
+        grey_row = np.repeat(greys[:, np.newaxis], 3, axis=1)
+
+        rw.write(grey_row.tobytes())
+        rw.read(padding)
+
 def convert_to_greyscale(rw: io.IOBase, bmp: BitmapHeader):
     row_width = 3 * bmp.width()
     padding = ((row_width + 3) & ~3) - row_width
@@ -79,7 +93,13 @@ def handle_connection(rw: io.IOBase) -> None | str:
         raise Exception('Could not validate BMP.')
 
     header.write_to(rw)
-    convert_to_greyscale(rw, header)
+
+    try:
+        import numpy as np
+        convert_to_greyscale_numpy(rw, header, np)
+    except:
+        convert_to_greyscale(rw, header)
+
     rw.write(rw.read())
     rw.flush()
 
@@ -88,16 +108,16 @@ if __name__ == "__main__":
         server.bind(('', 5678))
         server.listen()
 
-        print('Waiting for client to connect...')
-        sock, _ = server.accept()
+        while True:
+            print('Waiting for client to connect...')
+            sock, _ = server.accept()
 
-        with sock:
-            rw = sock.makefile('rwb', buffering=65_536)
+            with sock:
+                rw = sock.makefile('rwb', buffering=65_536)
 
-            try:
-                handle_connection(rw)
-            except Exception as e:
-                print(e, file=stderr)
-
-            sock.shutdown(socket.SHUT_RDWR)
+                try:
+                    handle_connection(rw)
+                    sock.shutdown(socket.SHUT_RDWR)
+                except Exception as e:
+                    print(e, file=stderr)
 

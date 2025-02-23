@@ -14,26 +14,26 @@ fn convert_to_greyscale<S: Read + Write>(
 ) -> std::io::Result<()> {
     let row_width = 3 * bmp.width() as usize;
     let padding = ((row_width + 3) & !3) - row_width;
-    let mut pixel_buffer = [0u8; 3];
-    let mut padding_buffer = vec![0u8; padding];
+    let padding_buffer = vec![0u8; padding];
+    let mut pixel_buffer = vec![0u8; row_width];
 
     for _row in 0..bmp.height() {
-        for _col in 0..bmp.width() {
-            reader.read_exact(&mut pixel_buffer)?;
-            let grey = 0.114 * pixel_buffer[0] as f64
-                + 0.587 * pixel_buffer[1] as f64
-                + 0.299 * pixel_buffer[2] as f64;
-            let grey = grey as u8;
+        reader.read_exact(&mut pixel_buffer)?;
 
-            for pixel_component in &mut pixel_buffer {
-                *pixel_component = grey;
+        for col in 0..bmp.width() as usize {
+            let offset = 3 * col;
+            let grey = 0.114 * pixel_buffer[offset + 0] as f64
+                + 0.587 * pixel_buffer[offset + 1] as f64
+                + 0.299 * pixel_buffer[offset + 2] as f64;
+
+            for pixel_component in &mut pixel_buffer[offset..offset + 3] {
+                *pixel_component = grey as u8;
             }
-
-            writer.write_all(&pixel_buffer)?;
         }
 
+        writer.write_all(&pixel_buffer)?;
+
         if padding > 0 {
-            reader.read_exact(&mut padding_buffer)?;
             writer.write_all(&padding_buffer)?;
         }
     }

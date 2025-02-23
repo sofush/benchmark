@@ -65,9 +65,10 @@ def convert_to_greyscale_numpy(rw: io.IOBase, bmp: BitmapHeader, np):
 
         greys = np.dot(row_data, [0.299, 0.587, 0.114]).astype(np.uint8)
         grey_row = np.repeat(greys[:, np.newaxis], 3, axis=1)
-
         rw.write(grey_row.tobytes())
-        rw.read(padding)
+
+        if padding > 0:
+            rw.write(rw.read(padding))
 
 def convert_to_greyscale(rw: io.IOBase, bmp: BitmapHeader):
     row_width = 3 * bmp.width()
@@ -79,7 +80,8 @@ def convert_to_greyscale(rw: io.IOBase, bmp: BitmapHeader):
             grey = int(0.114 * pixel[0] + 0.587 * pixel[1] + 0.299 * pixel[2])
             rw.write(bytes([ grey, grey, grey ]))
 
-        rw.read(padding)
+        if padding > 0:
+            rw.write(rw.read(padding))
 
 def handle_connection(rw: io.IOBase) -> None | str:
     header = None

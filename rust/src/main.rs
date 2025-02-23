@@ -20,13 +20,12 @@ fn convert_to_greyscale<S: Read + Write>(
     for _row in 0..bmp.height() {
         reader.read_exact(&mut pixel_buffer)?;
 
-        for col in 0..bmp.width() as usize {
-            let offset = 3 * col;
-            let grey = 0.114 * pixel_buffer[offset + 0] as f64
-                + 0.587 * pixel_buffer[offset + 1] as f64
-                + 0.299 * pixel_buffer[offset + 2] as f64;
+        for col in (0..row_width as usize).step_by(3) {
+            let grey = 0.114 * pixel_buffer[col + 0] as f64
+                + 0.587 * pixel_buffer[col + 1] as f64
+                + 0.299 * pixel_buffer[col + 2] as f64;
 
-            for pixel_component in &mut pixel_buffer[offset..offset + 3] {
+            for pixel_component in &mut pixel_buffer[col..col + 3] {
                 *pixel_component = grey as u8;
             }
         }

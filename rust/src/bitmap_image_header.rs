@@ -7,6 +7,7 @@ pub struct BitmapImageHeader {
 }
 
 impl BitmapImageHeader {
+    #[cfg(debug_assertions)]
     pub fn offset(&self) -> usize {
         let num = self.header[10..14].try_into().unwrap();
         u32::from_le_bytes(num) as usize

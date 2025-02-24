@@ -1,0 +1,8 @@
+body {
+	padding: 20px;
+}
+
+#chart-container {
+	position: relative;
+	height: 80vh;
+}

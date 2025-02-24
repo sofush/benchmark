@@ -5,12 +5,6 @@ import morgan from 'morgan';
 // const image = await Jimp.read('input.jpg');
 // const buffer = await image.getBuffer(JimpMime.bmp);
 
-// const client = net.createConnection({ port: 5678 }, async _ => {
-// 	console.log('Connected to server.');
-// 	client.write(buffer);
-// 	client.end();
-// });
-
 const app = express();
 const port = 3000;
 

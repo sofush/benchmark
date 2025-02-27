@@ -107,7 +107,7 @@ def handle_connection(rw: io.IOBase) -> None | str:
 
 if __name__ == "__main__":
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-        server.bind(('', 5678))
+        server.bind(('', 8082))
         server.listen()
 
         while True:

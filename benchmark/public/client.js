@@ -95,15 +95,8 @@ const initBarChart = () => {
 	new Chart(avgChartCtx, config);
 };
 
-const initCharts = () => {
-	initBarChart();
-
+const initLineChart = () => {
 	const rustChartCtx = document.getElementById('rust-chart');
-
-	const average = (ctx) => {
-		const values = ctx.chart.data.datasets[0].data;
-		return values.reduce((a, b) => a + b, 0) / values.length;
-	};
 
 	const annotation = {
 		type: 'line',
@@ -114,28 +107,29 @@ const initCharts = () => {
 		label: {
 			backgroundColor: '#a52b00',
 			display: true,
-			content: (ctx) => 'Gennemsnit: ' + average(ctx).toFixed(2) + 'ms',
 			position: '15%'
 		},
 		scaleID: 'y',
-		value: (ctx) => average(ctx)
 	};
 
-	new Chart(rustChartCtx, {
+	return new Chart(rustChartCtx, {
 		type: 'line',
 		data: {
-			labels: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
+			labels: ['', '', '', '', '', '', '', '', '', ''],
 			datasets: [{
 				backgroundColor: 'rgb(247, 76, 0)',
 				borderColor: 'rgba(247, 76, 0, 0.5)',
-				data: [24.92, 24.22, 15.99, 19.29, 22.68, 19.22, 16.2, 17.22, 18.5, 18.91],
+				data: [],
 				borderWidth: 4.5,
-				tension: 0.3,
-				cubicInterpolationMode: 'monotone',
+				tension: 0.2,
+				cubicInterpolationMode: 'default',
 			}]
 		},
 		options: {
 			responsive: true,
+			animation: {
+				duration: 200
+			},
 			plugins: {
 				legend: false,
 				annotation: {
@@ -149,6 +143,11 @@ const initCharts = () => {
 };
 
 document.addEventListener('DOMContentLoaded', async _ => {
+	const bar = initBarChart();
+	const rust = initLineChart();
+
+	const rustResults = [];
+
 	let ws = null;
 
 	try {
@@ -158,5 +157,77 @@ document.addEventListener('DOMContentLoaded', async _ => {
 		return;
 	}
 
-	initCharts();
+	ws.onmessage = ev => {
+		let msg = undefined;
+
+		try {
+			msg = JSON.parse(ev.data);
+		} catch (e) {
+			console.error(`Could not parse JSON from websocket message: ${e}`);
+			return;
+		}
+
+		chart = undefined;
+		results = undefined;
+
+		switch (msg.server) {
+			case 'rust':
+				chart = rust;
+				results = rustResults;
+				break;
+			case 'python':
+				return;
+			default:
+				console.error(`Unrecognized server name: ${msg.server}`);
+				return;
+		}
+
+		const elapsedMs = Math.round((msg.elapsed.secs / 1000) + (msg.elapsed.nanos / 1_000_000));
+		console.log(`Response from ${msg.server} server, benchmark took ${elapsedMs}ms`);
+
+		results.push({
+			filename: msg.filename,
+			elapsedMs,
+		});
+
+		if (results.length > 100) {
+			results.shift();
+		}
+
+		const dataset = results.slice(-10);
+		chart.data.datasets[0].data = dataset.map(d => d.elapsedMs);
+		chart.data.labels = dataset.map(d => d.filename);
+
+		const calculateMedian = (input) => {
+			const sorted = input.sort((a, b) => a - b);
+
+			if (sorted.length === 0)
+				return 0;
+
+			if (sorted.length % 2 == 1) {
+				const idx = Math.floor(sorted.length / 2);
+				return sorted[idx];
+			}
+
+			const half = sorted.length / 2;
+			const a = sorted[half - 1];
+			const b = sorted[half];
+			return (a + b) / 2;
+		};
+
+		const allElapsed = results.map(r => r.elapsedMs);
+		const newMedian = Math.floor(calculateMedian(allElapsed));
+		const step = 50;
+
+		const roundStepped = (number, step, down) => {
+			const out = Math.round(number / step) * step;
+			return down ? out : out + step;
+		};
+
+		chart.options.scales.y.min = roundStepped(Math.min(...allElapsed), step, true) - step;
+		chart.options.scales.y.max = roundStepped(Math.max(...allElapsed), step, false) + step;
+		chart.options.plugins.annotation.annotations[0].label.content = `Median: ${newMedian}ms`;
+		chart.options.plugins.annotation.annotations[0].value = newMedian;
+		chart.update();
+	};
 });

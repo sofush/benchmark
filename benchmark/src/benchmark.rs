@@ -1,4 +1,4 @@
-use crate::decode::ImageCollection;
+use crate::decode::{DecodedImage, ImageCollection};
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -44,36 +44,56 @@ async fn connect_to_server(config: &ServerConfig) -> anyhow::Result<TcpStream> {
 
 async fn benchmark_server(
     config: ServerConfig,
-    images: ImageCollection,
+    coll: ImageCollection,
     sender: Sender<BenchmarkResult>,
 ) -> anyhow::Result<()> {
-    for image in images.iter().cycle() {
-        let mut conn = connect_to_server(&config).await?;
-        let before = Instant::now();
-        println!(
-            "Writing image {} to {} server.",
-            image.filename, config.name
-        );
-        conn.write_all(&image.bytes).await?;
-        conn.shutdown().await?;
+    let images: &'static [DecodedImage] = coll.inner();
 
-        let expected_len = image.bytes.len();
-        let mut output = Vec::with_capacity(expected_len);
-        println!(
-            "Reading greyscale image {} from {} server.",
-            image.filename, config.name
-        );
-        conn.read_to_end(&mut output).await?;
-        let elapsed = Instant::now() - before;
+    for image in images.iter().cycle() {
+        let conn = connect_to_server(&config).await?;
+        let (mut reader, mut writer) = conn.into_split();
+        let mut set = JoinSet::new();
+        let timer = Instant::now();
+
+        set.spawn(async move {
+            let res = writer
+                .write_all(&image.bytes)
+                .await
+                .map(|_| image.bytes.len());
+
+            res
+        });
+
+        set.spawn(async move {
+            let mut buf = [0; 65535];
+            let mut read = 0;
+
+            loop {
+                read += match reader.read(&mut buf).await? {
+                    0 => break,
+                    n => n,
+                }
+            }
+
+            Ok(read)
+        });
+
+        let results = set
+            .join_all()
+            .await
+            .into_iter()
+            .collect::<std::io::Result<Vec<_>>>()?;
+
+        let elapsed = timer.elapsed();
+
+        if results.iter().any(|e| *e != image.bytes.len()) {
+            bail!("Read or wrote an incorrect amount of bytes.");
+        }
 
         println!(
             "Transaction for image {} succeeded for {} server, took {:?}.",
             image.filename, config.name, elapsed
         );
-
-        if output.len() != expected_len {
-            bail!("Expected {expected_len} bytes, received {}", output.len());
-        }
 
         sender.send(BenchmarkResult {
             server: config.name,
@@ -95,11 +115,9 @@ pub async fn start(
 
     for c in configs {
         println!("Starting benchmark for {} server.", c.name);
-        let images_clone = images.clone();
         let sender_clone = sender.clone();
         set.spawn(async move {
-            let benchmark =
-                benchmark_server(c, images_clone, sender_clone).await;
+            let benchmark = benchmark_server(c, images, sender_clone).await;
             (c, benchmark)
         });
     }

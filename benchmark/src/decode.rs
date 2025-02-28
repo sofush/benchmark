@@ -1,5 +1,5 @@
 use image::{ImageFormat, ImageReader};
-use std::{io::Cursor, path::PathBuf, sync::Arc};
+use std::{io::Cursor, path::PathBuf};
 use tokio::task::JoinSet;
 
 pub struct DecodedImage {
@@ -32,9 +32,9 @@ impl DecodedImage {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct ImageCollection {
-    images: Arc<Vec<DecodedImage>>,
+    images: &'static [DecodedImage],
 }
 
 impl ImageCollection {
@@ -53,11 +53,11 @@ impl ImageCollection {
         }
 
         Ok(Self {
-            images: Arc::new(images),
+            images: images.leak(),
         })
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &DecodedImage> + Clone {
-        self.images.iter()
+    pub fn inner(&self) -> &'static [DecodedImage] {
+        self.images
     }
 }

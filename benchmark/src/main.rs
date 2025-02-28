@@ -70,10 +70,14 @@ async fn websocket(
                     }
                 }
                 SelectResult::BroadcastMessage(msg) => {
-                    session
+                    if session
                         .text(serde_json::to_string(&msg).unwrap())
                         .await
-                        .unwrap();
+                        .is_err()
+                    {
+                        // session closed
+                        break;
+                    }
                 }
                 SelectResult::Error(error) => {
                     println!("Error: {error}");

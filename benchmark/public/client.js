@@ -182,7 +182,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
 				return;
 		}
 
-		const elapsedMs = Math.round((msg.elapsed.secs / 1000) + (msg.elapsed.nanos / 1_000_000));
+		const elapsedMs = Math.round((msg.elapsed.secs * 1_000) + (msg.elapsed.nanos / 1_000_000));
 		console.log(`Response from ${msg.server} server, benchmark took ${elapsedMs}ms`);
 
 		results.push({

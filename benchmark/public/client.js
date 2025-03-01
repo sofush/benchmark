@@ -95,30 +95,30 @@ const initBarChart = () => {
 	new Chart(avgChartCtx, config);
 };
 
-const initLineChart = () => {
-	const rustChartCtx = document.getElementById('rust-chart');
+const initLineChart = (options) => {
+	const chartCtx = document.getElementById(options.elementId);
 
 	const annotation = {
 		type: 'line',
-		borderColor: '#a52b00',
+		borderColor: options.annotationColor,
 		borderDash: [10, 20],
 		borderDashOffset: 0,
 		borderWidth: 3.0,
 		label: {
-			backgroundColor: '#a52b00',
+			backgroundColor: options.annotationColor,
 			display: true,
 			position: '15%'
 		},
 		scaleID: 'y',
 	};
 
-	return new Chart(rustChartCtx, {
+	return new Chart(chartCtx, {
 		type: 'line',
 		data: {
 			labels: ['', '', '', '', '', '', '', '', '', ''],
 			datasets: [{
-				backgroundColor: 'rgb(247, 76, 0)',
-				borderColor: 'rgba(247, 76, 0, 0.5)',
+				backgroundColor: options.background,
+				borderColor: options.border,
 				data: [],
 				borderWidth: 4.5,
 				tension: 0.2,
@@ -144,9 +144,21 @@ const initLineChart = () => {
 
 document.addEventListener('DOMContentLoaded', async _ => {
 	const bar = initBarChart();
-	const rust = initLineChart();
+	const rust = initLineChart({
+		elementId: 'rust-chart',
+		annotationColor: '#a52b00',
+		background: 'rgb(247, 76, 0)',
+		border: 'rgba(247, 76, 0, 0.5)',
+	});
+	const python = initLineChart({
+		elementId: 'python-chart',
+		annotationColor: '#4584b6',
+		background: 'rgb(69, 132, 182)',
+		border: 'rgba(69, 132, 182, 0.5)',
+	});
 
 	const rustResults = [];
+	const pythonResults = [];
 
 	let ws = null;
 
@@ -176,7 +188,9 @@ document.addEventListener('DOMContentLoaded', async _ => {
 				results = rustResults;
 				break;
 			case 'python':
-				return;
+				chart = python;
+				results = pythonResults;
+				break;
 			default:
 				console.error(`Unrecognized server name: ${msg.server}`);
 				return;

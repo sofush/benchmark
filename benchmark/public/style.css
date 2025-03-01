@@ -5,5 +5,5 @@ body {
 .chart-container {
 	position: relative;
 	width: calc(100vw - (2 * 20px));
-	max-height: 60vh;
+	max-height: 75vh;
 }

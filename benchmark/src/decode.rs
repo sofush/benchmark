@@ -43,7 +43,6 @@ impl ImageCollection {
 
         for entry in std::fs::read_dir("./images")? {
             set.spawn_blocking(move || DecodedImage::decode(entry?.path()));
-            break; // For testing
         }
 
         let mut images = vec![];

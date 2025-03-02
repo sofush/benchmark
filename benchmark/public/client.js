@@ -244,7 +244,7 @@ document.addEventListener('DOMContentLoaded', async _ => {
 			elapsedMs,
 		});
 
-		if (results.length > 100) {
+		if (results.length > 1000) {
 			results.shift();
 		}
 

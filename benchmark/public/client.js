@@ -16,83 +16,46 @@ const connectWebsocket = () => {
 	});
 };
 
-const initBarChart = () => {
-	const avgChartCtx = document.getElementById('avg-chart');
-	const datasets = [
-		{
+const initRadarChart = () => {
+	const radarChartCtx = document.getElementById('radar-chart');
+	const data = {
+		labels: [],
+		datasets: [{
 			label: 'Rust',
-			data: [{ x: 1, y: 22.8 }],
-			backgroundColor: 'rgba(247, 76, 0, 0.2)',
-			borderColor: 'rgba(255, 26, 104, 1)',
-			borderWidth: 1,
-			xAxisID: "x1",
-			categoryPercentage: 1,
-		},
-		{
-			label: 'Python + numpy',
-			data: [{ x: 2, y: 75.3 }],
-			backgroundColor: 'rgba(54, 162, 235, 0.2)',
-			borderColor: 'rgba(54, 162, 235, 1)',
-			borderWidth: 1,
-			xAxisID: "x1",
-			categoryPercentage: 1,
-		},
-		{
+			data: [],
+			fill: true,
+			backgroundColor: 'rgba(255, 99, 132, 0.2)',
+			borderColor: 'rgb(255, 99, 132)',
+			pointBackgroundColor: 'rgb(255, 99, 132)',
+			pointBorderColor: '#fff',
+			pointHoverBackgroundColor: '#fff',
+			pointHoverBorderColor: 'rgb(255, 99, 132)'
+		}, {
 			label: 'Python',
-			data: [{ x: 3, y: 5185.3 }],
+			data: [],
+			fill: true,
 			backgroundColor: 'rgba(54, 162, 235, 0.2)',
-			borderColor: 'rgba(54, 162, 235, 1)',
-			borderWidth: 1,
-			xAxisID: "x1",
-			categoryPercentage: 1,
-		},
-	];
-
-	const config = {
-		type: 'bar',
-		data: { datasets },
-		options: {
-			plugins: {
-				legend: true,
-				tooltip: {
-					callbacks: {
-						title(tooltipItems) {
-							if (tooltipItems.length) {
-								const item = tooltipItems[0];
-								const tick = item.chart.scales.x.ticks[item.datasetIndex];
-								return tick.label;
-							}
-						},
-						label: item => {
-							const value = item.formattedValue;
-							return `${value} ms`;
-						}
-					}
-				}
-			},
-			scales: {
-				x: {
-					labels: ctx => datasets.map(ds => ds.label).filter(a => {
-						const idx = datasets.findIndex(b => b.label == a);
-						return ctx.chart.isDatasetVisible(idx);
-					}),
-				},
-				x1: {
-					display: false,
-					offset: true
-				},
-				y: {
-					beginAtZero: true,
-					min: 0,
-					grid: {
-						drawOnChartArea: true
-					}
-				},
-			}
-		}
+			borderColor: 'rgb(54, 162, 235)',
+			pointBackgroundColor: 'rgb(54, 162, 235)',
+			pointBorderColor: '#fff',
+			pointHoverBackgroundColor: '#fff',
+			pointHoverBorderColor: 'rgb(54, 162, 235)'
+		}]
 	};
 
-	new Chart(avgChartCtx, config);
+	const config = {
+		type: 'radar',
+		data: data,
+		options: {
+			elements: {
+				line: {
+					borderWidth: 2
+				}
+			}
+		},
+	};
+
+	return new Chart(radarChartCtx, config);
 };
 
 const initLineChart = (options) => {
@@ -143,9 +106,7 @@ const initLineChart = (options) => {
 };
 
 const calculateMedian = (list) => {
-	console.log(`len: ${list.length}`);
 	const sorted = list.sort((a, b) => a - b);
-	console.log(sorted);
 
 	if (sorted.length === 0)
 		return 0;
@@ -182,8 +143,50 @@ const updateLineChart = (chart, results) => {
 	chart.update();
 };
 
+const updateRadarChartDataset = (chart, lang, labels, results) => {
+	const dataset = chart.data.datasets.find(ds => ds.label.toLowerCase() === lang.toLowerCase());
+	dataset.data = [];
+
+	for (const idx in labels) {
+		const label = labels[idx];
+
+		if (!(label in results))
+			continue;
+
+		const allElapsed = results[label];
+		const median = calculateMedian(allElapsed);
+		dataset.data.push(median);
+	}
+};
+
+const updateRadarChart = (chart, rustResults, pythonResults) => {
+	const labels = chart.data.labels;
+
+	for (const key in rustResults) {
+		if (!labels.includes(key)) {
+			labels.push(key);
+			labels.sort((a, b) => {
+				const anum = parseInt(a);
+				const bnum = parseInt(b);
+
+				if (anum === NaN || bnum === NaN) {
+					console.error('Filename does not start with a number.');
+					return 0;
+				}
+
+				const sign = Math.sign(anum - bnum);
+				return sign;
+			});
+		}
+	}
+
+	updateRadarChartDataset(chart, 'rust', labels, rustResults);
+	updateRadarChartDataset(chart, 'python', labels, pythonResults);
+	chart.update();
+};
+
 document.addEventListener('DOMContentLoaded', async _ => {
-	const bar = initBarChart();
+	const radar = initRadarChart();
 	const rust = initLineChart({
 		elementId: 'rust-chart',
 		annotationColor: '#a52b00',
@@ -197,8 +200,10 @@ document.addEventListener('DOMContentLoaded', async _ => {
 		border: 'rgba(69, 132, 182, 0.5)',
 	});
 
-	const rustResults = [];
-	const pythonResults = [];
+	const rustLineResults = [];
+	const pythonLineResults = [];
+	const rustRadarResults = {};
+	const pythonRadarResults = {};
 
 	let ws = null;
 
@@ -219,17 +224,20 @@ document.addEventListener('DOMContentLoaded', async _ => {
 			return;
 		}
 
-		chart = undefined;
-		results = undefined;
+		let chart = undefined;
+		let lineResults = undefined;
+		let radarResults = undefined;
 
 		switch (msg.server) {
 			case 'rust':
 				chart = rust;
-				results = rustResults;
+				lineResults = rustLineResults;
+				radarResults = rustRadarResults;
 				break;
 			case 'python':
 				chart = python;
-				results = pythonResults;
+				lineResults = pythonLineResults;
+				radarResults = pythonRadarResults;
 				break;
 			default:
 				console.error(`Unrecognized server name: ${msg.server}`);
@@ -237,17 +245,25 @@ document.addEventListener('DOMContentLoaded', async _ => {
 		}
 
 		const elapsedMs = Math.round((msg.elapsed.secs * 1_000) + (msg.elapsed.nanos / 1_000_000));
-		console.log(`Response from ${msg.server} server, benchmark took ${elapsedMs}ms`);
+		// console.log(`Response from ${msg.server} server, benchmark took ${elapsedMs}ms`);
 
-		results.push({
+		lineResults.push({
 			filename: msg.filename,
 			elapsedMs,
 		});
 
-		if (results.length > 1000) {
-			results.shift();
+		radarResults[msg.filename] ??= [];
+		radarResults[msg.filename].push(elapsedMs);
+
+		if (lineResults.length > 1000) {
+			lineResults.shift();
 		}
 
-		updateLineChart(chart, results);
+		if (radarResults[msg.filename].length > 100) {
+			radarResults[msg.filename].shift();
+		}
+
+		updateLineChart(chart, lineResults);
+		updateRadarChart(radar, rustRadarResults, pythonRadarResults);
 	};
 });

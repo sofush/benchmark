@@ -52,6 +52,29 @@ impl ImageCollection {
             images.push(res??);
         }
 
+        images.sort_by(|a, b| {
+            let a_num: Option<Result<usize, _>> = a
+                .filename
+                .split_once('.')
+                .map(|(l, _)| l)
+                .map(|s| s.parse());
+            let b_num: Option<Result<usize, _>> = b
+                .filename
+                .split_once('.')
+                .map(|(l, _)| l)
+                .map(|s| s.parse());
+
+            if let (Some(Ok(a_num)), Some(Ok(b_num))) = (a_num, b_num) {
+                return a_num.cmp(&b_num);
+            }
+
+            eprintln!(
+                "Error: could not sort images by filename: {} and {}.",
+                a.filename, b.filename
+            );
+            a.filename.cmp(&b.filename)
+        });
+
         Ok(Self {
             images: images.leak(),
         })

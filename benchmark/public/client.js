@@ -142,6 +142,46 @@ const initLineChart = (options) => {
 	});
 };
 
+const calculateMedian = (list) => {
+	console.log(`len: ${list.length}`);
+	const sorted = list.sort((a, b) => a - b);
+	console.log(sorted);
+
+	if (sorted.length === 0)
+		return 0;
+
+	if (sorted.length % 2 == 1) {
+		const idx = Math.floor(sorted.length / 2);
+		return sorted[idx];
+	}
+
+	const half = sorted.length / 2;
+	const a = sorted[half - 1];
+	const b = sorted[half];
+	return (a + b) / 2;
+};
+
+const updateLineChart = (chart, results) => {
+	const dataset = results.slice(-10);
+	chart.data.datasets[0].data = dataset.map(d => d.elapsedMs);
+	chart.data.labels = dataset.map(d => d.filename);
+
+	const allElapsed = results.map(r => r.elapsedMs);
+	const newMedian = Math.floor(calculateMedian(allElapsed));
+	const step = 50;
+
+	const steppedRound = (number, step, down) => {
+		const out = Math.round(number / step) * step;
+		return down ? out : out + step;
+	};
+
+	chart.options.scales.y.min = steppedRound(Math.min(...allElapsed), step, true) - step;
+	chart.options.scales.y.max = steppedRound(Math.max(...allElapsed), step, false) + step;
+	chart.options.plugins.annotation.annotations[0].label.content = `Median: ${newMedian}ms`;
+	chart.options.plugins.annotation.annotations[0].value = newMedian;
+	chart.update();
+};
+
 document.addEventListener('DOMContentLoaded', async _ => {
 	const bar = initBarChart();
 	const rust = initLineChart({
@@ -208,40 +248,6 @@ document.addEventListener('DOMContentLoaded', async _ => {
 			results.shift();
 		}
 
-		const dataset = results.slice(-10);
-		chart.data.datasets[0].data = dataset.map(d => d.elapsedMs);
-		chart.data.labels = dataset.map(d => d.filename);
-
-		const calculateMedian = (input) => {
-			const sorted = input.sort((a, b) => a - b);
-
-			if (sorted.length === 0)
-				return 0;
-
-			if (sorted.length % 2 == 1) {
-				const idx = Math.floor(sorted.length / 2);
-				return sorted[idx];
-			}
-
-			const half = sorted.length / 2;
-			const a = sorted[half - 1];
-			const b = sorted[half];
-			return (a + b) / 2;
-		};
-
-		const allElapsed = results.map(r => r.elapsedMs);
-		const newMedian = Math.floor(calculateMedian(allElapsed));
-		const step = 50;
-
-		const roundStepped = (number, step, down) => {
-			const out = Math.round(number / step) * step;
-			return down ? out : out + step;
-		};
-
-		chart.options.scales.y.min = roundStepped(Math.min(...allElapsed), step, true) - step;
-		chart.options.scales.y.max = roundStepped(Math.max(...allElapsed), step, false) + step;
-		chart.options.plugins.annotation.annotations[0].label.content = `Median: ${newMedian}ms`;
-		chart.options.plugins.annotation.annotations[0].value = newMedian;
-		chart.update();
+		updateLineChart(chart, results);
 	};
 });
